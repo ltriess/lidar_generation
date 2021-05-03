@@ -90,13 +90,13 @@ for epoch in range(1000):
         
             # train with real data
             real_out = dis(input)
-            real_d += [real_out.mean().data[0]]
+            real_d += [real_out.mean().data]
             
             # train with fake data 
             noise = torch.cuda.FloatTensor(args.batch_size, 100).normal_()
             fake  = gen(noise)
             fake_out = dis(fake)
-            fake_d += [fake_out.mean().data[0]]
+            fake_d += [fake_out.mean().data]
             
             if args.loss == 0 : 
                 dis_loss = (((real_out - fake_out.mean() - 1) ** 2).mean() + \
@@ -104,8 +104,8 @@ for epoch in range(1000):
             else:
                 dis_loss = (torch.mean((real_out - 1) ** 2) + torch.mean((fake_out - 0) ** 2)) / 2
 
-            losses_d += [dis_loss.mean().data[0]]
-            delta_d  += [(real_out.mean() - fake.mean()).data[0]]
+            losses_d += [dis_loss.mean().data]
+            delta_d  += [(real_out.mean() - fake.mean()).data]
            
             dis_optim.zero_grad()
             dis_loss.backward()
@@ -118,7 +118,7 @@ for epoch in range(1000):
         noise = torch.cuda.FloatTensor(args.batch_size, 100).normal_()
         fake = gen(noise)
         fake_out = dis(fake)
-        fake_g += [fake_out.mean().data[0]]        
+        fake_g += [fake_out.mean().data]
         
         if args.loss == 0: 
             iters += 1
@@ -129,7 +129,7 @@ for epoch in range(1000):
         else:
             gen_loss = torch.mean((fake_out - 1.) ** 2)
 
-        losses_g += [gen_loss.data[0]]
+        losses_g += [gen_loss.data]
        
         gen_optim.zero_grad()
         gen_loss.backward()
