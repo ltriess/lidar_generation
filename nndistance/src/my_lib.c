@@ -29,31 +29,31 @@ int nnd_forward(THFloatTensor *xyz1, THFloatTensor *xyz2, THFloatTensor *dist1, 
     int batchsize = xyz1->size[0];
     int n = xyz1->size[1];
     int m = xyz2->size[1];
-    
+
     //printf("%d %d %d\n", batchsize, n, m);
-    
+
     float *xyz1_data = THFloatTensor_data(xyz1);
     float *xyz2_data = THFloatTensor_data(xyz2);
     float *dist1_data = THFloatTensor_data(dist1);
     float *dist2_data = THFloatTensor_data(dist2);
     int *idx1_data = THIntTensor_data(idx1);
     int *idx2_data = THIntTensor_data(idx2);
-     
+
     nnsearch(batchsize, n, m, xyz1_data, xyz2_data, dist1_data, idx1_data);
     nnsearch(batchsize, m, n, xyz2_data, xyz1_data, dist2_data, idx2_data);
-    
+
     return 1;
 }
 
 
 int nnd_backward(THFloatTensor *xyz1, THFloatTensor *xyz2, THFloatTensor *gradxyz1, THFloatTensor *gradxyz2, THFloatTensor *graddist1, THFloatTensor *graddist2, THIntTensor *idx1, THIntTensor *idx2) {
-    
+
     int b = xyz1->size[0];
     int n = xyz1->size[1];
     int m = xyz2->size[1];
-    
+
     //printf("%d %d %d\n", batchsize, n, m);
-    
+
     float *xyz1_data = THFloatTensor_data(xyz1);
     float *xyz2_data = THFloatTensor_data(xyz2);
     float *gradxyz1_data = THFloatTensor_data(gradxyz1);
@@ -63,7 +63,7 @@ int nnd_backward(THFloatTensor *xyz1, THFloatTensor *xyz2, THFloatTensor *gradxy
     int *idx1_data = THIntTensor_data(idx1);
     int *idx2_data = THIntTensor_data(idx2);
 
-    
+
     for (int i=0;i<b*n*3;i++)
         gradxyz1_data[i]=0;
     for (int i=0;i<b*m*3;i++)

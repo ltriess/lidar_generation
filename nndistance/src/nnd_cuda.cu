@@ -165,7 +165,7 @@ int NmDistanceGradKernelLauncher(int b,int n,const float * xyz1,int m,const floa
 	cudaMemset(grad_xyz2,0,b*m*3*4);
 	NmDistanceGradKernel<<<dim3(1,16,1),256>>>(b,n,xyz1,m,xyz2,grad_dist1,idx1,grad_xyz1,grad_xyz2);
 	NmDistanceGradKernel<<<dim3(1,16,1),256>>>(b,m,xyz2,n,xyz1,grad_dist2,idx2,grad_xyz2,grad_xyz1);
-	
+
 	cudaError_t err = cudaGetLastError();
 	  if (err != cudaSuccess) {
 	    printf("error in nnd get grad: %s\n", cudaGetErrorString(err));
@@ -173,6 +173,6 @@ int NmDistanceGradKernelLauncher(int b,int n,const float * xyz1,int m,const floa
 	    return 0;
 	  }
 	  return 1;
-	
+
 }
 

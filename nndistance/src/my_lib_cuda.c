@@ -20,8 +20,8 @@ int nnd_forward_cuda(THCudaTensor *xyz1, THCudaTensor *xyz2, THCudaTensor *dist1
 	THCState_getCurrentStream(state)
 	);
 	//int NmDistanceKernelLauncher(int b,int n,const float * xyz,int m,const float * xyz2,float * result,int * result_i,float * result2,int * result2_i, cudaStream_t stream)
-		
-    
+
+
     if (!success) {
     THError("aborting");
     }
@@ -29,9 +29,9 @@ int nnd_forward_cuda(THCudaTensor *xyz1, THCudaTensor *xyz2, THCudaTensor *dist1
 }
 
 
-int nnd_backward_cuda(THCudaTensor *xyz1, THCudaTensor *xyz2, THCudaTensor *gradxyz1, THCudaTensor *gradxyz2, THCudaTensor *graddist1, 
+int nnd_backward_cuda(THCudaTensor *xyz1, THCudaTensor *xyz2, THCudaTensor *gradxyz1, THCudaTensor *gradxyz2, THCudaTensor *graddist1,
 					  THCudaTensor *graddist2, THCudaIntTensor *idx1, THCudaIntTensor *idx2) {
-    
+
     int success = 0;
     success = NmDistanceGradKernelLauncher(xyz1->size[0],
 	xyz1->size[1],
@@ -44,7 +44,7 @@ int nnd_backward_cuda(THCudaTensor *xyz1, THCudaTensor *xyz2, THCudaTensor *grad
 	THCudaIntTensor_data(state, idx2),
 	THCudaTensor_data(state, gradxyz1),
 	THCudaTensor_data(state, gradxyz2),
-	THCState_getCurrentStream(state)	
+	THCState_getCurrentStream(state)
 	);
 	//int NmDistanceGradKernelLauncher(int b,int n,const float * xyz1,int m,const float * xyz2,const float * grad_dist1,const int * idx1,const float * grad_dist2,const int * idx2,float * grad_xyz1,float * grad_xyz2, cudaStream_t stream)
 

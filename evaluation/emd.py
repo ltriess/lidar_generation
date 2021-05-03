@@ -1,16 +1,23 @@
-from torch.autograd import Function, Variable
-import numpy as np
+from collections import namedtuple
+from string import Template
+
+import cupy
 import torch
-import torch.nn as nn
-import pdb
-from torch.nn.modules.utils import _pair
-from pyinn.utils import Dtype, Stream, load_kernel
-import torch.nn.functional as F
-from torch.autograd import gradcheck
+from torch.autograd import Function
+
+from ..utils import from_polar
 
 
+@cupy.memoize(True)
+def load_kernel(kernel_name, code, **kwargs):
+    code = Template(code).substitute(**kwargs)
+    kernel_code = cupy.cuda.compile_with_cache(code)
+    return kernel_code.get_function(kernel_name)
 
-approxmatch_kernel = '''
+
+Stream = namedtuple("Stream", ["ptr"])
+
+approxmatch_kernel = """
 extern "C"
 __global__ void approxmatch(int b,int n,int m,const float * __restrict__ xyz1,const float * __restrict__ xyz2,float * __restrict__ match,float * temp){
         float * remainL=temp+blockIdx.x*(n+m)*2, * remainR=temp+blockIdx.x*(n+m)*2+n,*ratioL=temp+blockIdx.x*(n+m)*2+n+m,*ratioR=temp+blockIdx.x*(n+m)*2+n+m+n;
@@ -190,9 +197,9 @@ __global__ void approxmatch(int b,int n,int m,const float * __restrict__ xyz1,co
                         __syncthreads();
                 }
         }
-}'''
+}"""
 
-matchcost_kernel = '''
+matchcost_kernel = """
 extern "C"
 __global__ void matchcost(int b,int n,int m,const float * __restrict__ xyz1,const float * __restrict__ xyz2,const float * __restrict__ match,float * __restrict__ out){
         __shared__ float allsum[512];
@@ -236,9 +243,9 @@ __global__ void matchcost(int b,int n,int m,const float * __restrict__ xyz1,cons
                         out[i]=allsum[0];
                 __syncthreads();
         }
-}'''
+}"""
 
-matchcostgrad2_kernel = '''
+matchcostgrad2_kernel = """
 extern "C"
 __global__ void matchcostgrad2(int b,int n,int m,const float * __restrict__ xyz1,const float * __restrict__ xyz2,const float * __restrict__ match,float * __restrict__ grad2){
         __shared__ float sum_grad[256*3];
@@ -280,9 +287,9 @@ __global__ void matchcostgrad2(int b,int n,int m,const float * __restrict__ xyz1
                         __syncthreads();
                 }
         }
-}'''
+}"""
 
-matchcostgrad1_kernel = '''
+matchcostgrad1_kernel = """
 extern "C"
 __global__ void matchcostgrad1(int b,int n,int m,const float * __restrict__ xyz1,const float * __restrict__ xyz2,const float * __restrict__ match,float * __restrict__ grad1){
         for (int i=blockIdx.x;i<b;i+=gridDim.x){
@@ -306,87 +313,104 @@ __global__ void matchcostgrad1(int b,int n,int m,const float * __restrict__ xyz1
                 }
         }
 }
-'''
-#void approxmatchLauncher(int b,int n,int m,const float * xyz1,const float * xyz2,float * match,float * temp){
+"""
+# void approxmatchLauncher(int b,int n,int m,const float * xyz1,const float * xyz2,float * match,float * temp){
 #       approxmatch<<<32,512>>>(b,n,m,xyz1,xyz2,match,temp);
 # }
 
 
-
 class EMD(Function):
-
     def forward(self, a, b):
 
-        # same preprocessing as chamfer 
+        # same preprocessing as chamfer
         if a.dim() == 4:
-            if a.size(1) == 2: 
+            if a.size(1) == 2:
                 a = from_polar(a)
 
             assert a.size(1) == 3
             a = a.permute(0, 2, 3, 1).contiguous().reshape(a.size(0), -1, 3)
-            
+
         if b.dim() == 4:
-            if b.size(1) == 2: 
+            if b.size(1) == 2:
                 b = from_polar(b)
 
             assert b.size(1) == 3
             b = b.permute(0, 2, 3, 1).contiguous().reshape(b.size(0), -1, 3)
 
         assert a.dim() == b.dim() == 3
-        if a.size(-1) != 3: 
+        if a.size(-1) != 3:
             assert a.size(-2) == 3
             a = a.transpose(-2, -1).contiguous()
-        
-        if b.size(-1) != 3: 
+
+        if b.size(-1) != 3:
             assert b.size(-2) == 3
             b = a.transpose(-2, -1).contiguous()
 
         xyz1, xyz2 = a, b
         batch_size, num_pts, pt_dim = xyz1.size()
-        _         , m      , _      = xyz2.size()
+        _, m, _ = xyz2.size()
 
         match = torch.zeros(batch_size, m, num_pts).cuda()
-        cost = torch.zeros(batch_size, ).cuda()
-        temp = torch.zeros(batch_size, 2 * (m+num_pts)).cuda()
+        cost = torch.zeros(
+            batch_size,
+        ).cuda()
+        temp = torch.zeros(batch_size, 2 * (m + num_pts)).cuda()
 
         n = xyz1.numel()
 
         with torch.cuda.device_of(xyz1):
             # 1) get matching
-            f = load_kernel('approxmatch', approxmatch_kernel)
-            f(block=(512, 1, 1), # (CUDA_NUM_THREADS,1,1),
-              grid=(32, 1, 1),   # GET_BLOCKS(n),1,1),
-              args=[batch_size, num_pts, m, xyz1.data_ptr(), xyz2.data_ptr(), match.data_ptr(), temp.data_ptr()],
-              stream=Stream(ptr=torch.cuda.current_stream().cuda_stream))
+            f = load_kernel("approxmatch", approxmatch_kernel)
+            f(
+                block=(512, 1, 1),  # (CUDA_NUM_THREADS,1,1),
+                grid=(32, 1, 1),  # GET_BLOCKS(n),1,1),
+                args=[
+                    batch_size,
+                    num_pts,
+                    m,
+                    xyz1.data_ptr(),
+                    xyz2.data_ptr(),
+                    match.data_ptr(),
+                    temp.data_ptr(),
+                ],
+                stream=Stream(ptr=torch.cuda.current_stream().cuda_stream),
+            )
 
             # 2) calculate matching cost
-            g = load_kernel('matchcost', matchcost_kernel)
-            g(block=(512, 1, 1), # (CUDA_NUM_THREADS, 1, 1),
-              grid=(32, 1, 1),   # (GET_BLOCKS(n), 1, 1),
-              args=[batch_size, num_pts, m, xyz1.data_ptr(), xyz2.data_ptr(), match.data_ptr(), cost.data_ptr()],
-              stream=Stream(ptr=torch.cuda.current_stream().cuda_stream))
+            g = load_kernel("matchcost", matchcost_kernel)
+            g(
+                block=(512, 1, 1),  # (CUDA_NUM_THREADS, 1, 1),
+                grid=(32, 1, 1),  # (GET_BLOCKS(n), 1, 1),
+                args=[
+                    batch_size,
+                    num_pts,
+                    m,
+                    xyz1.data_ptr(),
+                    xyz2.data_ptr(),
+                    match.data_ptr(),
+                    cost.data_ptr(),
+                ],
+                stream=Stream(ptr=torch.cuda.current_stream().cuda_stream),
+            )
 
-
-        self.xyz1       = xyz1
-        self.xyz2       = xyz2
-        self.match      = match
-        self.cost       = cost
-        self.num_pts    = num_pts
-        self.m          = m
-        self.numel      = n
+        self.xyz1 = xyz1
+        self.xyz2 = xyz2
+        self.match = match
+        self.cost = cost
+        self.num_pts = num_pts
+        self.m = m
+        self.numel = n
         self.batch_size = batch_size
         del temp
 
         return cost
 
     def backward(self, grad_cost):
-        xyz1       = self.xyz1
-        xyz2       = self.xyz2
-        match      = self.match
-        cost       = self.cost
-        m          = self.m
-        numel      = self.numel
-        num_pts    = self.num_pts
+        xyz1 = self.xyz1
+        xyz2 = self.xyz2
+        match = self.match
+        m = self.m
+        num_pts = self.num_pts
         batch_size = self.batch_size
 
         grad1 = torch.zeros_like(xyz1).cuda()
@@ -394,17 +418,37 @@ class EMD(Function):
 
         with torch.cuda.device_of(grad_cost):
             if xyz1.requires_grad:
-                f = load_kernel('matchcostgrad1', matchcostgrad1_kernel)
-                f(block=(512, 1, 1), # (CUDA_NUM_THREADS, 1, 1),
-                grid=(32, 1, 1),     # (GET_BLOCKS(xyz1.numel()), 1, 1),
-                args=[batch_size, num_pts, m, xyz1.data_ptr(), xyz2.data_ptr(), match.data_ptr(), grad1.data_ptr()],
-                stream=Stream(ptr=torch.cuda.current_stream().cuda_stream))
+                f = load_kernel("matchcostgrad1", matchcostgrad1_kernel)
+                f(
+                    block=(512, 1, 1),  # (CUDA_NUM_THREADS, 1, 1),
+                    grid=(32, 1, 1),  # (GET_BLOCKS(xyz1.numel()), 1, 1),
+                    args=[
+                        batch_size,
+                        num_pts,
+                        m,
+                        xyz1.data_ptr(),
+                        xyz2.data_ptr(),
+                        match.data_ptr(),
+                        grad1.data_ptr(),
+                    ],
+                    stream=Stream(ptr=torch.cuda.current_stream().cuda_stream),
+                )
 
             if xyz2.requires_grad:
-                g = load_kernel('matchcostgrad2', matchcostgrad2_kernel)
-                g(block=(256, 1, 1), # (CUDA_NUM_THREADS, 1, 1),
-                grid=(32, 32, 1),    # (GET_BLOCKS(xyz2.numel()), 1, 1),
-                args=[batch_size, num_pts, m, xyz1.data_ptr(), xyz2.data_ptr(), match.data_ptr(), grad2.data_ptr()],
-                stream=Stream(ptr=torch.cuda.current_stream().cuda_stream))
+                g = load_kernel("matchcostgrad2", matchcostgrad2_kernel)
+                g(
+                    block=(256, 1, 1),  # (CUDA_NUM_THREADS, 1, 1),
+                    grid=(32, 32, 1),  # (GET_BLOCKS(xyz2.numel()), 1, 1),
+                    args=[
+                        batch_size,
+                        num_pts,
+                        m,
+                        xyz1.data_ptr(),
+                        xyz2.data_ptr(),
+                        match.data_ptr(),
+                        grad2.data_ptr(),
+                    ],
+                    stream=Stream(ptr=torch.cuda.current_stream().cuda_stream),
+                )
 
         return grad1 * grad_cost.view(-1, 1, 1), grad2 * grad_cost.view(-1, 1, 1)

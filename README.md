@@ -3,44 +3,44 @@
 Code for reproducing all results in our paper, which can be found [here](https://arxiv.org/abs/1812.01180) </br>
 Additional results can be found [here](https://github.com/pclucas14/lidar_generation/#Additional-Results)
 
-## (key) Requirements 
+## (key) Requirements
 - Pytorch 0.4.1/0.4.0
 - TensorboardX
 - Mayavi (for display only)
 
 ## Structure
 
-    ├── Evaluation 
+    ├── Evaluation
         ├── eval.py             # Evaluation of conditional generation, using Chamfer and EMD metrics
-        ├── generate.py         # Generate point clouds from a pretrained model, both for clean and corrupted input        
-    ├── Launch Scripts          
+        ├── generate.py         # Generate point clouds from a pretrained model, both for clean and corrupted input
+    ├── Launch Scripts
         ├── vae_rs.py           # launch the hyperparameter search used for the proposed VAE models
         ├── baseline_rs.py      # launch the hyperparameter search used for the baseline models
-    ├── Trained Models  
+    ├── Trained Models
         ├── ....                # contains the weights of the models (ours and baseline) used in the paper
     ├── Training Logs
         ├── ....                # Contains all the tensorboard logs for all the model hyperparameter searches
     ├── gan_2d.py               # Training file for GAN model
     ├── vae_2d.py               # Training file for the VAE models
     ├── models.py               # Implementation of all the model architectures used in the paper
-    ├── utils.py                # Utilies for preprocessing and visualitation 
+    ├── utils.py                # Utilies for preprocessing and visualitation
 
 Models are logged according to the following file sturcture, where the root is specified using the `--base_dir` flag
 
     ├── <base_dir>
         ├── TB/
-            ├── ...             # Contains the Tensorboard logs 
-        ├── models/  
+            ├── ...             # Contains the Tensorboard logs
+        ├── models/
             ├── ...             # Contains the saved model weights, stored as `.pth` files.
-    ├── args.json               # List of all the hyperparameters used for training.     
+    ├── args.json               # List of all the hyperparameters used for training.
 
 
-    
+
 ## Train a model
-We provide the full list of commands to replicate all of our results. 
+We provide the full list of commands to replicate all of our results.
 
 ### VAE experiments
-The general command is 
+The general command is
 `python vae_2d.py <flags>` e.g. <br/>
 `python vae_2d.py --z_dim=256 --batch_size=64 --kl_warmup_epochs=100` <br/> <br/>
 To get more information regarding the different flags, you can run `python vae_2d.py --help` <br/>
@@ -93,7 +93,7 @@ Here we repeat the same corruption process, but with even more noise
 
 
 ## Aknowledgements
-Thanks to [Fxia2](https://github.com/fxia22/) for his NNDistance module. 
+Thanks to [Fxia2](https://github.com/fxia22/) for his NNDistance module.
 Thanks to [Thibault GROUEIX](https://github.com/ThibaultGROUEIX) and [Panos Achlioptas](https://github.com/optas) for open sourcing their code. </br>
 Thanks to [Alexia JM](https://github.com/AlexiaJM/RelativisticGAN) for her open source code on Relativistic GANs. Please check out her work if you are working with GANs! <br/>
 Thanks to Alexandre Bachaalani for his video editing help!
@@ -105,8 +105,8 @@ If you find this code useful please cite us in your work.
 ```
 @INPROCEEDINGS{8968535,
   author={L. {Caccia} and H. v. {Hoof} and A. {Courville} and J. {Pineau}},
-  booktitle={2019 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)}, 
-  title={Deep Generative Modeling of LiDAR Data}, 
+  booktitle={2019 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)},
+  title={Deep Generative Modeling of LiDAR Data},
   year={2019},
   volume={},
   number={},
