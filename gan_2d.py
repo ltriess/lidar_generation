@@ -6,8 +6,8 @@ import tensorboardX
 import torch.optim as optim
 import torch.utils.data
 
-import utils
-from models import netD, netG
+from dgm.common import utils
+from dgm.common.models import netD, netG
 
 parser = argparse.ArgumentParser(description="GAN training of LiDAR")
 parser.add_argument("--batch_size", type=int, default=64)

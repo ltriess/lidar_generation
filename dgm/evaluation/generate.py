@@ -4,7 +4,7 @@ import sys
 import numpy as np
 import torch.utils.data
 
-import utils
+from dgm.common import utils
 
 # reproducibility is good
 np.random.seed(0)

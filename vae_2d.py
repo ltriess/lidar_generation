@@ -6,8 +6,8 @@ import tensorboardX
 import torch.optim as optim
 import torch.utils.data
 
-import utils
-from models import VAE
+from dgm.common import utils
+from dgm.common.models import VAE
 
 parser = argparse.ArgumentParser(description="VAE training of LiDAR")
 parser.add_argument(

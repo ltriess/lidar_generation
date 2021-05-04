@@ -1,4 +1,4 @@
-# Code to find the closest example w.r.t EMD in the training data
+# Code to find the closest example w.r.t EMD in the training common
 # For now let's only do MSE, as EMD is long and painful.
 
 import argparse
@@ -7,7 +7,7 @@ import os
 import numpy as np
 import torch.utils.data
 
-import utils
+from dgm.common import utils
 
 parser = argparse.ArgumentParser(
     description="Find Closest Neighbor of a set of samples"

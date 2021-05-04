@@ -5,7 +5,7 @@ import numpy as np
 import torch.utils.data
 from emd import EMD
 
-import utils
+from dgm.common import utils
 
 """
 Expect two arguments:

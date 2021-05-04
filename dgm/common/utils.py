@@ -306,7 +306,7 @@ def get_chamfer_dist(get_slow=False):
 
         import sys
 
-        sys.path.insert(0, "./nndistance")
+        sys.path.insert(0, "../nndistance")
         from nndistance.modules.nnd import NNDModule
 
         dist = NNDModule()

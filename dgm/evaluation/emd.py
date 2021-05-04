@@ -5,7 +5,7 @@ import cupy
 import torch
 from torch.autograd import Function
 
-from ..utils import from_polar
+from dgm.common.utils import from_polar
 
 
 @cupy.memoize(True)
