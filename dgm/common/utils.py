@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import os
 
 import numpy as np
@@ -152,49 +155,7 @@ def remove_zeros(pc):
     return xx.cpu().data.numpy()
 
 
-def preprocess(dataset):
-    # remove outliers
-    # min_a, max_a = np.percentile(dataset[:, :, :, [0]], 1), np.percentile(dataset[:, :, :, [0]], 99)
-    # min_b, max_b = np.percentile(dataset[:, :, :, [1]], 1), np.percentile(dataset[:, :, :, [1]], 99)
-    # min_c, max_c = np.percentile(dataset[:, :, :, [2]], 1), np.percentile(dataset[:, :, :, [2]], 99)
-    min_a, max_a = -41.1245002746582, 36.833248138427734
-    min_b, max_b = -25.833599090576172, 30.474000930786133
-    min_c, max_c = -2.3989999294281006, 0.7383332848548889
-    dataset = dataset[:, 5:45]
-
-    mask = np.maximum(dataset[:, :, :, 0] < min_a, dataset[:, :, :, 0] > max_a)
-    mask = np.maximum(
-        mask, np.maximum(dataset[:, :, :, 1] < min_b, dataset[:, :, :, 1] > max_b)
-    )
-    mask = np.maximum(
-        mask, np.maximum(dataset[:, :, :, 2] < min_c, dataset[:, :, :, 2] > max_c)
-    )
-
-    dist = dataset[:, :, :, 0] ** 2 + dataset[:, :, :, 1] ** 2
-    mask = np.maximum(mask, dist < 7)
-
-    dataset = dataset * (1 - np.expand_dims(mask, -1))
-    dataset /= np.absolute(dataset).max()
-
-    dataset = to_polar_np(dataset).transpose(0, 3, 1, 2)
-
-    remove = []
-    for i in range(dataset.shape[0]):
-        # print('processing {}/{}'.format(i, dataset.shape[0]))
-        try:
-            pp = remove_zeros(dataset[i]).squeeze(0)
-            dataset[i] = pp
-        except Exception:
-            print("removing %d" % i)
-            remove += [i]
-
-    for i in remove:
-        dataset = np.concatenate([dataset[: i - 1], dataset[i + 1 :]], axis=0)
-
-    return dataset[:, :, :, ::2]
-
-
-def show_pc(velo, save=0, save_path=None):
+def show_pc(velo, save_path=None):
     import mayavi.mlab
 
     fig = mayavi.mlab.figure(size=(1400, 700), bgcolor=(0, 0, 0))
@@ -228,11 +189,7 @@ def show_pc(velo, save=0, save_path=None):
     f = mayavi.mlab.gcf()
     f.scene.camera.zoom(2.7)
 
-    if save:
-        print(save)
-        mayavi.mlab.savefig(f"../inter_images_2/{i}.png")
-        mayavi.mlab.close()
-    elif save_path is not None:
+    if save_path is not None:
         mayavi.mlab.savefig(save_path)
         mayavi.mlab.close()
     else:

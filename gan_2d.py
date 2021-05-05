@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import argparse
 import os
 
@@ -7,9 +10,12 @@ import torch.optim as optim
 import torch.utils.data
 
 from dgm.common import utils
+from dgm.common.loader import KittiDataset
 from dgm.common.models import netD, netG
 
 if __name__ == "__main__":
+    root_dir = os.path.dirname(os.path.abspath(__file__))
+
     parser = argparse.ArgumentParser(description="GAN training of LiDAR")
     parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--loss", type=int, help="0 == LSGAN, 1 == RaLSGAN")
@@ -46,16 +52,14 @@ if __name__ == "__main__":
     writer = tensorboardX.SummaryWriter(log_dir=os.path.join(args.base_dir, "TB"))
     writes = 0
 
-    # dataset preprocessing
-    dataset = np.load("../../lidar_generation/kitti_data/lidar.npz")
-    dataset = utils.preprocess(dataset).astype("float32")
-    dataset = utils.from_polar_np(dataset) if args.no_polar else dataset
+    # Create the dataset and the loader.
+    dataset = KittiDataset(
+        dataset_file=os.path.join(root_dir, "kitti_data", "converted", "train.dataset"),
+    )
 
     loader = torch.utils.data.DataLoader(
         dataset, batch_size=args.batch_size, shuffle=True, num_workers=4, drop_last=True
     )
-
-    num_batches = len(loader)
 
     print(gen)
     print(dis)
@@ -77,14 +81,16 @@ if __name__ == "__main__":
     # gan training
     # ------------------------------------------------------------------------------------------------
     for epoch in range(1000):
+        print("##############################")
+        print(f"Epoch {epoch:4d} / 1000")
+        print("##############################")
         data_iter = iter(loader)
         iters = 0
         real_d, fake_d, fake_g, losses_g, losses_d, delta_d = [[] for _ in range(6)]
 
         while iters < len(loader):
+            print(f"Iteration {iters:3d} / {len(loader)}")
             j = 0
-            # if iters > 10 : break
-            # print(iters)
 
             """ Update Discriminator Network """
             for p in dis.parameters():
@@ -94,7 +100,8 @@ if __name__ == "__main__":
                 j += 1
                 iters += 1
 
-                inp = data_iter.next().cuda()
+                inp, _ = next(data_iter)
+                inp = inp.cuda()
 
                 # train with real data
                 real_out = dis(inp)

@@ -5,11 +5,14 @@ import numpy as np
 import torch.utils.data
 
 from dgm.common import utils
+from dgm.common.loader import KittiDataset
 
 # reproducibility is good
 np.random.seed(0)
 torch.manual_seed(0)
 torch.cuda.manual_seed_all(0)
+
+root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 nb_samples = 200
 out_dir = sys.argv[3]  # os.path.join(sys.argv[3], 'final_samples')
@@ -76,18 +79,12 @@ with torch.no_grad():
         sys.argv[1], epoch=int(sys.argv[2]), model="gen"
     )[0].cuda()
     print("test set reconstruction")
-    try:
-        dataset = np.load("kitti_data/lidar_test.npz")
-    except Exception:
-        dataset = np.load("../lidar_generation/kitti_data/lidar_test.npz")
-    dataset = utils.preprocess(dataset).astype("float32")
-
-    if save_test_dataset:
-        np.save(os.path.join(out_dir, "test_set"), dataset)
-
-    # dataset_test = from_polar_np(dataset) if model.args.no_polar else dataset
+    # Create the dataset and the loader.
+    dataset_test = KittiDataset(
+        dataset_file=os.path.join(root_dir, "kitti_data", "converted", "test.dataset"),
+    )
     loader = torch.utils.data.DataLoader(
-        dataset, batch_size=10, shuffle=False, num_workers=4, drop_last=False
+        dataset_test, batch_size=10, shuffle=False, num_workers=4, drop_last=False
     )
 
     """
@@ -151,8 +148,7 @@ with torch.no_grad():
         reals, recons, corrs = [], [], []
 
         process_inp = (lambda x: x) if model.args.no_polar else utils.to_polar
-        for batch in loader:
-
+        for batch, _ in loader:
             batch = batch.cuda()
             batch_xyz = utils.from_polar(batch)
             noise_tensor = torch.zeros_like(batch_xyz).normal_(0, noise)

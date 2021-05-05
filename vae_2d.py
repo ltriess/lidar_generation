@@ -1,3 +1,7 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+
 import argparse
 import os
 
@@ -7,9 +11,12 @@ import torch.optim as optim
 import torch.utils.data
 
 from dgm.common import utils
+from dgm.common.loader import KittiDataset
 from dgm.common.models import VAE
 
 if __name__ == "__main__":
+    root_dir = os.path.dirname(os.path.abspath(__file__))
+
     parser = argparse.ArgumentParser(description="VAE training of LiDAR")
     parser.add_argument(
         "--batch_size",
@@ -94,16 +101,15 @@ if __name__ == "__main__":
     writes = 0
     ns = 16
 
-    # dataset preprocessing
-    print("loading data")
-    dataset_train = np.load("../lidar_generation/kitti_data/lidar.npz")
-    dataset_val = np.load("../lidar_generation/kitti_data/lidar_val.npz")
-
-    if args.debug:
-        dataset_train, dataset_val = dataset_train[:128], dataset_val[:128]
-
-    dataset_train = utils.preprocess(dataset_train).astype("float32")
-    dataset_val = utils.preprocess(dataset_val).astype("float32")
+    # Create the datasets and the loaders.
+    dataset_train = KittiDataset(
+        dataset_file=os.path.join(root_dir, "kitti_data", "converted", "train.dataset"),
+        debug=args.debug,
+    )
+    dataset_val = KittiDataset(
+        dataset_file=os.path.join(root_dir, "kitti_data", "converted", "val.dataset"),
+        debug=args.debug,
+    )
 
     train_loader = torch.utils.data.DataLoader(
         dataset_train,
@@ -135,14 +141,17 @@ if __name__ == "__main__":
     # ------------------------------------------------------------------------------
 
     for epoch in range(150 if args.autoencoder else 300):
-        print("epoch %s" % epoch)
+        print("##############################")
+        print(f"Epoch {epoch:4d} / 1000")
+        print("##############################")
         model.train()
         loss_, elbo_, kl_cost_, kl_obj_, recon_ = [[] for _ in range(5)]
 
         # Output is always in polar, however input can be (X,Y,Z) or (D,Z)
         process_input = utils.from_polar if args.no_polar else lambda x: x
 
-        for i, img in enumerate(train_loader):
+        for i, (img, _) in enumerate(train_loader):
+            print(f"Iteration {i:3d} / {len(train_loader)}")
             img = img.cuda()
             recon, kl_cost = model(process_input(img))
 
@@ -200,7 +209,8 @@ if __name__ == "__main__":
             model.eval()
             if epoch % 1 == 0:
                 print("test set evaluation")
-                for img in val_loader:
+                for i_val, (img, _) in enumerate(val_loader):
+                    print(f"Iteration {i_val:3d} / {len(val_loader)}")
                     img = img.cuda()
                     recon, kl_cost = model(process_input(img))
 

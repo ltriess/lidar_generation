@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 # Code to find the closest example w.r.t EMD in the training common
 # For now let's only do MSE, as EMD is long and painful.
 
@@ -8,6 +11,9 @@ import numpy as np
 import torch.utils.data
 
 from dgm.common import utils
+from dgm.common.loader import KittiDataset
+
+root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 parser = argparse.ArgumentParser(
     description="Find Closest Neighbor of a set of samples"
@@ -40,10 +46,12 @@ utils.maybe_create_dir(args.output_path)
 # load samples
 target_pcs = np.load(args.sample_path)
 
-# load target dataset
-dataset = np.load("kitti_data/lidar.npz")
-dataset = utils.preprocess(dataset).astype("float32")
-dataset_train = utils.from_polar_np(dataset) if target_pcs.shape[1] == 3 else dataset
+# Create the target dataset and the loader.
+dataset_train = KittiDataset(
+    dataset_file=os.path.join(root_dir, "kitti_data", "converted", "train.dataset"),
+    use_xyz=target_pcs.shape[1] == 3,
+)
+
 train_loader = torch.utils.data.DataLoader(
     dataset_train,
     batch_size=args.batch_size,
@@ -71,7 +79,7 @@ for index in args.sample_indices:
     best_ind = -1
 
     # iterate over "real" dataset
-    for i, batch in enumerate(train_loader):
+    for i, (batch, _) in enumerate(train_loader):
         batch = batch.cuda()
 
         if args.metric == "mse":
@@ -94,7 +102,7 @@ for index in args.sample_indices:
 
     # instead of save the point clouds, we just save the picture of the point cloud.
     print(f"closest point cloud has MSE {best_val:.4f} with pc @ index {index}")
-    closest = dataset[[best_ind]]
+    closest = dataset_train[best_ind]
     target = target.cpu().data.numpy()
 
     if closest.shape[1] == 2:

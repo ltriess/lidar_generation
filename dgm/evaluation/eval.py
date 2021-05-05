@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import os
 import sys
 
@@ -6,6 +9,7 @@ import torch.utils.data
 from emd import EMD
 
 from dgm.common import utils
+from dgm.common.loader import KittiDataset
 
 """
 Expect two arguments:
@@ -20,10 +24,11 @@ np.random.seed(0)
 torch.manual_seed(0)
 torch.cuda.manual_seed_all(0)
 
+root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 nb_samples = 200
 out_dir = os.path.join(sys.argv[1], "final_samples")
 utils.maybe_create_dir(out_dir)
-save_test_dataset = False
 size = 10 if "emd" in sys.argv[3] else 5
 fast = True
 
@@ -50,17 +55,14 @@ with torch.no_grad():
 
     # 2) load data
     print("test set reconstruction")
-    dataset = np.load("../lidar_generation/kitti_data/lidar_test.npz")
-    if fast:
-        dataset = dataset[:100]
-    dataset_test = utils.preprocess(dataset).astype("float32")
-
-    if save_test_dataset:
-        np.save(os.path.join(out_dir, "test_set"), dataset)
-
+    # Create the dataset and the loader.
+    dataset_test = KittiDataset(
+        dataset_file=os.path.join(root_dir, "kitti_data", "converted", "test.dataset"),
+        debug=fast,
+    )
     loader = torch.utils.data.DataLoader(
         dataset_test, batch_size=size, shuffle=True, num_workers=4, drop_last=True
-    )  # False))
+    )
 
     loss_fn = loss()
     process_input = (lambda x: x) if model.args.no_polar else utils.to_polar
@@ -72,7 +74,7 @@ with torch.no_grad():
         []
     ):  # 0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.][::(2 if fast else 1)]:
         losses = []
-        for batch in loader:
+        for batch, _ in loader:
             batch = batch.cuda()
             batch_xyz = utils.from_polar(batch)
             noise_tensor = torch.zeros_like(batch_xyz).normal_(0, noise)
@@ -111,7 +113,7 @@ with torch.no_grad():
         0.999,
     ]:  # [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45][::(2 if fast else 1)]:
         losses = []
-        for batch in loader:
+        for batch, _ in loader:
             batch = batch.cuda()
             batch_xyz = utils.from_polar(batch)
 
