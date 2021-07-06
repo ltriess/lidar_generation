@@ -3,6 +3,7 @@
 
 import os
 
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -101,6 +102,32 @@ def log_point_clouds(writer, data, name, step):
     for i, cloud in enumerate(out):
         cloud = cloud.view(-1, 3)
         writer.add_embedding(cloud, tag=name + "_%d" % i, global_step=step)
+
+
+def log_images(writer, data, name, step):
+    assert len(data.shape) == 4
+    data = data.cpu().data.numpy()
+
+    dist = data[:, 0, :, :]
+    z = data[:, 1, :, :]
+
+    angles = np.linspace(0, np.pi * 2, data.shape[3])[np.newaxis, np.newaxis, ...]
+    x = np.cos(angles) * dist
+    y = np.sin(angles) * dist
+
+    depth = np.sqrt(x ** 2 + y ** 2 + z ** 2)
+
+    for i in range(data.shape[0]):
+        plt.imshow(depth[i], cmap="magma_r", vmin=0, vmax=1)
+        writer.add_figure(f"depth/{name}_{i:02d}", plt.gcf(), global_step=step)
+        plt.close()
+
+        fig = plt.figure(figsize=(6, 6))
+        plt.scatter(x[i], y[i], s=0.2, c=z[i])
+        plt.xlim((-1, 1))
+        plt.ylim((-1, 1))
+        writer.add_figure(f"xyz/{name}_{i:02d}", fig, global_step=step)
+        plt.close(fig)
 
 
 def print_and_save_args(args, path):

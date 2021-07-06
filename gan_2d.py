@@ -78,6 +78,8 @@ if __name__ == "__main__":
         gen_optim = optim.RMSprop(gen.parameters(), lr=args.gen_lr)
         dis_optim = optim.RMSprop(dis.parameters(), lr=args.dis_lr)
 
+    noise_for_image = torch.cuda.FloatTensor(3, 100).normal_()
+
     # gan training
     # ------------------------------------------------------------------------------------------------
     for epoch in range(1000):
@@ -163,6 +165,7 @@ if __name__ == "__main__":
         utils.print_and_log_scalar(writer, "delta_d", delta_d, writes)
         utils.print_and_log_scalar(writer, "losses_gen", losses_g, writes)
         utils.print_and_log_scalar(writer, "losses_dis", losses_d, writes)
+        utils.log_images(writer, gen(noise_for_image), "generated", writes)
         writes += 1
 
         # save some training reconstructions
